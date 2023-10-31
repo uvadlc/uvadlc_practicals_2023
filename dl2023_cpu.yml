@@ -4,8 +4,8 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.10.12
-  - pip=23.1.2
+  - python=3.11.5
+  - pip=23.3.1
   - cpuonly=2.0
   - pytorch=2.1.0
   - torchvision=0.16.0
