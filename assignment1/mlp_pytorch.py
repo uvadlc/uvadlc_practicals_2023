@@ -59,7 +59,20 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        super().__init__()
+
+        l = [n_inputs] + n_hidden + [n_classes]
+        layers = []
+        for idx in range(1, len(l)):
+          n_input = l[idx - 1]
+          n_output = l[idx]
+          layers.append(nn.Linear(n_input, n_output))
+          # last layer
+          if idx == len(l) - 1:
+             continue
+          layers.append(nn.ELU())
+        
+        self.layers = nn.ModuleList(layers)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -81,7 +94,10 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        x = x.view(x.size(0), -1)
+        for l in self.layers:
+            x = l(x)
+        out = x
         #######################
         # END OF YOUR CODE    #
         #######################

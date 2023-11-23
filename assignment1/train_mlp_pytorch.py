@@ -32,6 +32,8 @@ import cifar10_utils
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def confusion_matrix(predictions, targets):
@@ -49,12 +51,20 @@ def confusion_matrix(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    pred_y = np.argmax(predictions, axis=1)
+    num_class = predictions.shape[1]
+    # row represents prediction and col represents ground truth
+    conf_mat = np.zeros((num_class, num_class))
+    for ith_sample, pred in enumerate(pred_y):
+        truth = targets[ith_sample]
+        conf_mat[pred][truth] += 1
     #######################
     # END OF YOUR CODE    #
     #######################
     return conf_mat
 
+def _fscore(precision, recall, beta):
+    return (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
 
 def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     """
@@ -70,14 +80,21 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    row_sum = np.sum(confusion_matrix, axis=1)
+    col_sum = np.sum(confusion_matrix, axis=0)
+    true_pred = np.diag(confusion_matrix)
+    total_samples = np.sum(confusion_matrix)
+    metrics = {}
+    metrics['precision'] = true_pred / row_sum
+    metrics['recall'] = true_pred / col_sum
+    metrics['accuracy'] = np.sum(true_pred) / total_samples 
+    metrics['f1_beta'] = _fscore(metrics['precision'], metrics['recall'], beta)
     #######################
     # END OF YOUR CODE    #
     #######################
     return metrics
 
-
-def evaluate_model(model, data_loader, num_classes=10):
+def evaluate_model(model, data_loader, num_classes=10, plot=False):
     """
     Performs the evaluation of the MLP model on a given dataset.
 
@@ -97,12 +114,38 @@ def evaluate_model(model, data_loader, num_classes=10):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    model.eval()
+    all_conf_mat = np.zeros((num_classes, num_classes))
+    for batch_x, batch_y in data_loader:
+        with torch.no_grad():
+            batch_pred = model(batch_x)
+            all_conf_mat += confusion_matrix(batch_pred, batch_y)
+    if plot:
+        _plot_confusion_matrix(all_conf_mat)
+        for beta in [.1, 1, 10]:
+          metrics = confusion_matrix_to_metrics(all_conf_mat, beta)
+          print(f'beta {beta} fcore: {metrics["f1_beta"]}' )
 
+    metrics = confusion_matrix_to_metrics(all_conf_mat)
     #######################
     # END OF YOUR CODE    #
     #######################
     return metrics
 
+def _plot_confusion_matrix(confusion_matrix):
+  plt.figure(figsize=(8, 6))
+  sns.heatmap(confusion_matrix, annot=True, fmt="f", cmap='Blues')
+  plt.xlabel('Predicted Class')
+  plt.ylabel('Actual Class')
+  plt.title('Confusion Matrix')
+  plt.show()
+
+def _plot_losses(losses):
+  plt.plot(losses)
+  plt.xlabel('Epoch')
+  plt.ylabel('Loss')
+  plt.title('Training Loss')
+  plt.show()
 
 def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     """
@@ -157,17 +200,55 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    import math
+    def kaiming_init(model):
+      for name, param in model.named_parameters():
+          if name.endswith(".bias"):
+              param.data.fill_(0)
+          elif name.startswith("layers.0"): # The first layer does not have ReLU applied on its input
+              param.data.normal_(0, 1/math.sqrt(param.shape[1]))
+          else:
+              param.data.normal_(0, math.sqrt(2)/math.sqrt(param.shape[1]))
 
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    n_input = 32*32*3
+    n_hidden = hidden_dims
+    n_classes = 10
+    model = MLP(n_input, n_hidden, n_classes)
+    kaiming_init(model)
+    loss_module = nn.CrossEntropyLoss()
+    best_models = []
     # TODO: Training loop including validation
     # TODO: Do optimization with the simple SGD optimizer
-    val_accuracies = ...
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    losses = []
+    for ep in range(epochs):
+      model.train()
+      total_loss = 0
+      total_batch = 0
+      for x, y in cifar10_loader['train']:
+        total_batch += 1
+        y_pred = model(x)
+        loss = loss_module(y_pred, y)
+        total_loss += loss.item()
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+      metrics = evaluate_model(model, cifar10_loader['validation'])
+      best_models.append((metrics['accuracy'], deepcopy(model)))
+      print(metrics['accuracy'])
+      losses.append(total_loss / total_batch)
+    # _plot_losses(losses)
+    val_accuracies = [acc for acc, _ in best_models]
     # TODO: Test best model
-    test_accuracy = ...
+    best_model = best_models[np.argmax(val_accuracies)][1]
+    metrics = evaluate_model(best_model, cifar10_loader['test'])
+    test_accuracy = metrics['accuracy']
+    print('best accuracy', test_accuracy)
+    print('best precision', metrics['precision'])
+    print('best recall', metrics['recall'])
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_info = {}
     #######################
     # END OF YOUR CODE    #
     #######################

@@ -46,11 +46,24 @@ class LinearModule(object):
         # and gradients in this format, otherwise some unit tests might fail.
         self.params = {'weight': None, 'bias': None} # Model parameters
         self.grads = {'weight': None, 'bias': None} # Gradients
-
+        self.cache = {}
+        self.input_layer = input_layer
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        def _kaiming(shape, first_layer):
+          std = np.sqrt(2.0 / shape[1])
+          if first_layer:
+            std = 1 / np.sqrt(shape[1])
+          w = np.random.normal(0, std, size=shape)
+          b = np.zeros((1, shape[0]))
+          return w, b
+        shape = (out_features, in_features)
+        w, b = _kaiming(shape, input_layer)
+        self.params['weight'] = w
+        self.params['bias'] = b
+        self.grads['weight'] = np.zeros(shape)
+        self.grads['bias'] = np.zeros((1, out_features))
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -73,7 +86,10 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        w = self.params['weight']
+        b = self.params['bias']
+        out = x @ w.T + b
+        self.cache['input'] = x
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -97,7 +113,15 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        # W = R^(N x M), input = R^(S x M), dout = R^(S x N)
+        # R^(N x M) = Transpose(R^(M x S) * R^(S x N)) 
+        d_w = (self.cache['input'].T @ dout).T
+        d_b = np.sum(dout, axis=0)
+        d_b = np.reshape(d_b, (1, d_b.shape[0]))
+        # R^(S x M) = R^(S x N) * R^(N x M)
+        dx = dout @ self.params['weight']
+        self.grads['weight'] = d_w 
+        self.grads['bias'] = d_b
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -114,7 +138,7 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        self.cache = {}
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -143,7 +167,11 @@ class ELUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        def _ELU(x):
+          return np.where(x >= 0, x, np.exp(x) - 1)
+        self.cache = {'input': x} 
+        # X = R^(S, M)
+        out = _ELU(x)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -165,7 +193,9 @@ class ELUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        def _ELU_grad(x):
+          return np.where(x >= 0, 1, np.exp(x))
+        dx = _ELU_grad(self.cache['input']) * dout
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -182,7 +212,7 @@ class ELUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        self.cache = {}
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -192,6 +222,8 @@ class SoftMaxModule(object):
     """
     Softmax activation module.
     """
+    def __init__(self):
+        self.cache = {}
 
     def forward(self, x):
         """
@@ -211,7 +243,11 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        def _softmax_stablized(x):
+            e_z = np.exp(x - np.max(x, axis=1, keepdims=True))
+            return e_z / e_z.sum(axis=1, keepdims=True)
+        out = _softmax_stablized(x)
+        self.cache['out'] = out
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -229,11 +265,34 @@ class SoftMaxModule(object):
         TODO:
         Implement backward pass of the module.
         """
-
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        # out = R^(S x M)
+        out = self.cache['out']
+        # jacobian = R^(M x M)
+        # jacobian = diag(out) - out*out.T
+        # algo 1
+        # diag_batch = np.einsum('ij,jk->jk', out, np.eye(out.shape[1]))
+        # outter_batch = np.einsum('ij,ik->jk', out, out)
+        # jacobian_batch = diag_batch - outter_batch
+        # dx_0 = dout @ jacobian_batch
+        # algo 2
+        # diag_batch = np.einsum('ij,jk->ijk', out, np.eye(out.shape[1]))
+        # outter_batch = np.einsum('ij,ik->ijk', out, out)
+        # jacobian_batch = diag_batch - outter_batch
+        # dx = np.zeros(dout.shape)
+        # for i in range(out.shape[0]):
+        #     dx += jacobian_batch[i] @ dout[i]
+        # dout = R^(S x M)
+        # dx = dout * jacobian
+        # dx = R^(S x M) * R^(M x M) = R^(S x M)
+        # ones = np.ones(out.shape[1])
+        # v = dout * out @ ones.T
+        # v = np.reshape(v, (dout.shape[0], 1))
+        # dx_2 = out * dout - v
+        # print(dx_0[0], '\n', dx[0], '\n',  dx_2[0])
+        dx = out * (dout - (dout * out).sum(axis=1)[:, None])
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -251,7 +310,7 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        self.cache = {}
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -261,6 +320,11 @@ class CrossEntropyModule(object):
     """
     Cross entropy loss module.
     """
+
+    def _one_hot_encoded(self, x, y):
+        ohe = np.zeros(x.shape)
+        ohe[np.arange(x.shape[0]), y] = 1
+        return ohe
 
     def forward(self, x, y):
         """
@@ -278,7 +342,9 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        # X=R^(SxN) Y=R^(S)
+        one_hot_encoded = self._one_hot_encoded(x, y)
+        out = np.mean(-np.einsum('ik,ik->i', one_hot_encoded, np.log(x)))
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -301,7 +367,11 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        # dL/dx = -1/S*Y/X
+        one_hot_encoded_labels = self._one_hot_encoded(x, y)
+        sample_size = len(y)
+        dx = one_hot_encoded_labels/x
+        dx /= -sample_size
         #######################
         # END OF YOUR CODE    #
         #######################

@@ -38,7 +38,7 @@ def eval_numerical_gradient(f, x, verbose=True, h=0.00001):
         x[ix] = oldval - h
         fxmh = f(x)
         x[ix] = oldval
-
+        v = (fxph - fxmh) / (2 * h)
         grad[ix] = (fxph - fxmh) / (2 * h)
         if verbose:
             print(ix, grad[ix])
@@ -77,7 +77,7 @@ class TestLosses(unittest.TestCase):
             y = np.random.randint(C, size=(N,))
             X = np.random.uniform(low=1e-2, high=1.0, size=(N, C))
             X /= X.sum(axis=1, keepdims=True)
-
+            
             loss = CrossEntropyModule().forward(X, y)
             grads = CrossEntropyModule().backward(X, y)
 

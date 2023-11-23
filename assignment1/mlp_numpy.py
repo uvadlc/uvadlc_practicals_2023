@@ -48,11 +48,24 @@ class MLP(object):
         TODO:
         Implement initialization of the network.
         """
-
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        self.n_inputs = n_inputs
+        # layers records the size of each layer including input + hidden layers + output 
+        l = [n_inputs] + n_hidden + [n_classes]
+        self.layers = []
+        for idx in range(1, len(l)):
+            input = l[idx - 1]
+            output = l[idx]
+            first_layer = False
+            if idx == 1:
+                first_layer = True
+                        # last layer
+            if idx == len(l) - 1:
+              self.layers.extend([LinearModule(in_features=input, out_features=output, input_layer=first_layer), SoftMaxModule()])
+              continue
+            self.layers.extend([LinearModule(in_features=input, out_features=output, input_layer=first_layer), ELUModule()])
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -74,7 +87,9 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        out = x
+        for idx, l in enumerate(self.layers):
+            out = l.forward(out)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -95,7 +110,9 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        for i in range(len(self.layers)-1, -1, -1):
+            dout = self.layers[i].backward(dout)
+        return dout
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -112,7 +129,8 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        for l in self.layers:
+            l.clear_cache()
         #######################
         # END OF YOUR CODE    #
         #######################

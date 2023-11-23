@@ -27,8 +27,10 @@ import os
 from tqdm.auto import tqdm
 from copy import deepcopy
 from mlp_numpy import MLP
-from modules import CrossEntropyModule
+from modules import CrossEntropyModule, LinearModule
 import cifar10_utils
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import torch
 
@@ -48,12 +50,20 @@ def confusion_matrix(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    pred_y = np.argmax(predictions, axis=1)
+    num_class = predictions.shape[1]
+    # row represents prediction and col represents ground truth
+    conf_mat = np.zeros((num_class, num_class))
+    for ith_sample, pred in enumerate(pred_y):
+        truth = targets[ith_sample]
+        conf_mat[pred][truth] += 1
     #######################
     # END OF YOUR CODE    #
     #######################
     return conf_mat
 
+def _fscore(precision, recall, beta):
+    return (1 + beta**2) * precision * recall / (beta**2 * precision + recall)
 
 def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     """
@@ -69,14 +79,21 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    row_sum = np.sum(confusion_matrix, axis=1)
+    col_sum = np.sum(confusion_matrix, axis=0)
+    true_pred = np.diag(confusion_matrix)
+    total_samples = np.sum(confusion_matrix)
+    metrics = {}
+    metrics['precision'] = true_pred / row_sum
+    metrics['recall'] = true_pred / col_sum
+    metrics['accuracy'] = np.sum(true_pred) / total_samples 
+    metrics['f1_beta'] = _fscore(metrics['precision'], metrics['recall'], beta)
     #######################
     # END OF YOUR CODE    #
     #######################
     return metrics
 
-
-def evaluate_model(model, data_loader, num_classes=10):
+def evaluate_model(model, data_loader, num_classes=10, plot=False):
     """
     Performs the evaluation of the MLP model on a given dataset.
 
@@ -97,12 +114,39 @@ def evaluate_model(model, data_loader, num_classes=10):
     # PUT YOUR CODE HERE  #
     #######################
 
+    all_conf_mat = np.zeros((num_classes, num_classes))
+    for batch_x, batch_y in data_loader:
+        batch_x = np.reshape(batch_x, (batch_x.shape[0], -1))
+        batch_pred = model.forward(batch_x)
+        all_conf_mat += confusion_matrix(batch_pred, batch_y)
+    if plot:
+      _plot_confusion_matrix(all_conf_mat)
+      for beta in [.1, 1, 10]:
+        metrics = confusion_matrix_to_metrics(all_conf_mat, beta)
+        print(f'beta {beta} fcore: {metrics["f1_beta"]}' )
+    metrics = confusion_matrix_to_metrics(all_conf_mat)
+        
     #######################
     # END OF YOUR CODE    #
     #######################
     return metrics
 
+def _plot_confusion_matrix(confusion_matrix):
+  plt.figure(figsize=(8, 6))
+  sns.heatmap(confusion_matrix, annot=True, fmt="f", cmap='Blues')
+  plt.xlabel('Predicted Class')
+  plt.ylabel('Actual Class')
+  plt.title('Confusion Matrix')
+  plt.show()
 
+def _plot_losses(losses):
+  plt.plot(losses)
+  plt.xlabel('Epoch')
+  plt.ylabel('Loss')
+  plt.title('Training Loss')
+  plt.show()
+
+    
 
 def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     """
@@ -148,16 +192,54 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    n_input = 32*32*3
+    n_hidden = hidden_dims
+    n_classes = 10
+    model = MLP(n_input, n_hidden, n_classes)
+    loss_module = CrossEntropyModule()
     # TODO: Training loop including validation
-    val_accuracies = ...
+    X = []
+    Y = []
+    for i, batch in enumerate(cifar10_loader['train']):
+          batch_x = batch[0]
+          batch_x = batch_x.reshape(batch_x.shape[0], -1)
+          X.append(batch_x)
+          Y.append(batch[1])
+    best_models = []
+    losses = []
+    for ep in range(epochs):
+        total_loss = 0
+        num_batch = 0
+        for batch_idx in range(len(X)):
+            batch_x = X[batch_idx]
+            batch_y = Y[batch_idx]
+            sample_size = len(batch_y)
+            num_batch += 1
+            out = model.forward(batch_x)
+            loss = loss_module.forward(out, batch_y)
+            total_loss += loss
+            dout = loss_module.backward(out, batch_y)
+            model.backward(dout)
+            for l in model.layers:
+              if isinstance(l, LinearModule):
+                l.params['weight'] -= lr * l.grads['weight'] 
+                l.params['bias'] -= lr * l.grads['bias'] 
+            model.clear_cache()
+        losses.append(total_loss/num_batch)
+        print(f'Epoch {ep+1}/{epochs}: loss = {total_loss/num_batch}')
+
+        metrics = evaluate_model(model, cifar10_loader['validation'])
+        best_models.append((metrics['accuracy'], deepcopy(model)))        
+    # _plot_losses(losses)
+    val_accuracies = [acc for acc, _ in best_models]
     # TODO: Test best model
-    test_accuracy = ...
+    best_model = best_models[np.argmax(val_accuracies)][1]
+    metrics = evaluate_model(best_model, cifar10_loader['test'])
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_dict = {}
+    test_accuracy = metrics['accuracy']
+    print("best accuracy", test_accuracy)
     #######################
     # END OF YOUR CODE    #
     #######################
