@@ -231,11 +231,6 @@ class Learner:
             # END OF YOUR CODE    #
             #######################
 
-            # Note: we clamp to 4.6052 = ln(100), as in the original paper.
-            self.clip.logit_scale.data = torch.clamp(
-                self.clip.logit_scale.data, 0, 4.6052
-            )
-
             # Measure accuracy
             acc1 = accuracy(output, target, topk=(1,))
             losses.update(loss.item(), images.size(0))
