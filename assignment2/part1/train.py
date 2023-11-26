@@ -21,6 +21,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import torchvision.models as models
+import torch.optim as optim
+
+from copy import deepcopy
 
 from cifar100_utils import get_train_validation_set, get_test_set, set_dataset
 
@@ -50,12 +53,14 @@ def get_model(num_classes=100):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
     # Get the pretrained ResNet18 model on ImageNet from torchvision.models
-    pass
-
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    for param in model.parameters():
+        param.requires_grad = False
     # Randomly initialize and modify the model's last layer for CIFAR100.
-    pass
+    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+    nn.init.normal_(model.fc.weight, mean=0, std=0.01)
+    nn.init.constant_(model.fc.bias, 0)
 
     #######################
     # END OF YOUR CODE    #
@@ -85,22 +90,47 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     #######################
 
     # Load the datasets
-    pass
 
+    # Loading the datase
+    kwargs = {'num_workers': 1, 'pin_memory': True} if torch.cuda.is_available() else {}
+    train_set, val_set = get_train_validation_set(data_dir=data_dir, augmentation_name=augmentation_name)
+    train_loader = data.DataLoader(dataset=train_set, batch_size=batch_size, **kwargs)
+    val_loader = data.DataLoader(dataset=val_set, batch_size=batch_size, **kwargs)
     # Initialize the optimizer (Adam) to train the last layer of the model.
-    pass
+    optimizer = optim.Adam(model.fc.parameters(), lr=lr)
 
     # Training loop with validation after each epoch. Save the best model.
-    pass
+    loss_module = nn.CrossEntropyLoss()
+    losses = []
+    prev_acc = 0
+    for ep in range(epochs):
+      model.train()
+      total_loss = 0
+      total_batch = 0
+      for x, y in train_loader:
+        print("batch ", total_batch)
+        x = x.to(device)
+        y = y.to(device)
+        total_batch += 1
+        y_pred = model(x)
+        loss = loss_module(y_pred, y)
+        total_loss += loss.item()
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+      acc = evaluate_model(model, val_loader, device)
+      print(f'epoch: {ep} acc: {acc}')
+      if acc > prev_acc:
+        torch.save(model, checkpoint_name)
+      losses.append(total_loss / total_batch)
 
     # Load the best model on val accuracy and return it.
-    pass
-
+    best_model = torch.load(checkpoint_name)
     #######################
     # END OF YOUR CODE    #
     #######################
 
-    return model
+    return best_model
 
 
 def evaluate_model(model, data_loader, device):
@@ -123,8 +153,18 @@ def evaluate_model(model, data_loader, device):
 
     # Loop over the dataset and compute the accuracy. Return the accuracy
     # Remember to use torch.no_grad().
-    pass
-
+    model.eval()
+    correct = 0
+    total = 0
+    for batch_x, batch_y in data_loader:
+        with torch.no_grad():
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
+            batch_pred = np.argmax(model(batch_x).cpu().numpy(), axis=1)
+            print(batch_pred.shape, batch_y.shape)
+            correct += np.sum(np.equal(batch_pred, batch_y.cpu().numpy()))
+            total += batch_y.shape[0]
+    accuracy = correct / total
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -148,22 +188,27 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name, test_noise):
     # PUT YOUR CODE HERE  #
     #######################
     # Set the seed for reproducibility
-    pass
+    set_seed(seed)
 
     # Set the device to use for training
-    pass
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Load the model
-    pass
+    model = get_model()
+    model = model.to(device)
 
     # Get the augmentation to use
-    pass
+    
 
     # Train the model
-    pass
+    best_model = train_model(model=model, lr=lr, batch_size=batch_size, epochs=epochs, data_dir=data_dir, checkpoint_name="best_model", device=device, augmentation_name=augmentation_name)
 
     # Evaluate the model on the test set
-    pass
+    test_set = get_test_set(data_dir=data_dir, test_noise=test_noise)
+    test_loader = data.DataLoader(test_set, batch_size=batch_size)
+    acc = evaluate_model(model=best_model, data_loader=test_loader, device=device)
+
+    # default setting 30 epochs acc=0.5728. 
+    print(acc)
 
     #######################
     # END OF YOUR CODE    #

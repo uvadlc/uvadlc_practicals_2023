@@ -28,7 +28,9 @@ from torchvision.datasets import CIFAR10, CIFAR100
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
+from torch.nn.functional import normalize
 from utils import AverageMeter, set_seed
+
 
 
 DATASET = {"cifar10": CIFAR10, "cifar100": CIFAR100}
@@ -169,10 +171,11 @@ class ZeroshotCLIP(nn.Module):
         # Hint:
         # - Read the CLIP API documentation for more details:
         #   https://github.com/openai/CLIP#api
-
-        # remove this line once you implement the function
-        raise NotImplementedError("Implement the precompute_text_features function.")
-
+        text_inputs = torch.cat([clip.tokenize(p) for p in prompts]).to(device)
+        with torch.no_grad():
+            text_features = clip_model.encode_text(text_inputs)
+        text_features = normalize(text_features, dim=-1)
+        return text_features
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -208,10 +211,14 @@ class ZeroshotCLIP(nn.Module):
         # Hint:
         # - Read the CLIP API documentation for more details:
         #   https://github.com/openai/CLIP#api
-
         # remove this line once you implement the function
-        raise NotImplementedError("Implement the model_inference function.")
-
+        image = image.unsqueeze(0).to(self.device)
+        image_features = self.clip_model.encode_image(image)
+        # Note: Ensure that the feature vectors are normalized (to unit length) before computing the similarity. 
+        # This is crucial for the dot product to accurately represent cosine similarity.
+        image_features = normalize(image_features, dim=-1)
+        logits_per_image = self.logit_scale * image_features @ self.text_features.t()
+        return  logits_per_image
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -370,10 +377,21 @@ def main():
     # - Before filling this part, you should first complete the ZeroShotCLIP class
     # - Updating the accuracy meter is as simple as calling top1.update(accuracy, batch_size)
     # - You can use the model_inference method of the ZeroshotCLIP class to get the logits
-
     # you can remove the following line once you have implemented the inference loop
-    raise NotImplementedError("Implement the inference loop")
-
+    count = 0
+    for batch_x, batch_y in loader:
+        count += 1
+        print(f'batch-{count}')
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+        batch_size = batch_y.shape[0]
+        predictions = torch.zeros(batch_size).to(device)
+        for idx, img in enumerate(batch_x):
+            logits = clipzs.model_inference(img)
+            pred = torch.argmax(logits, dim=1)
+            predictions[idx] = pred
+        correct = (predictions == batch_y).sum().item()
+        top1.update(correct/batch_size, batch_size)
     #######################
     # END OF YOUR CODE    #
     #######################

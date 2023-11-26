@@ -125,4 +125,4 @@ def save_checkpoint(state, args, is_best=False, filename="checkpoint.pth.tar"):
         print("saved best file")
 
 class DummyArgs:
-    pass
+    pass

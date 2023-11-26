@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
+from torch.nn.functional import normalize
 
 from clip import clip
 from vp import (
@@ -83,7 +84,10 @@ class VisualPromptCLIP(nn.Module):
         # - Return a tensor of shape (num_prompts, 512).
 
         # remove this line once you implement the function
-        raise NotImplementedError("Write the code to compute text features.")
+        text_inputs = torch.cat([clip.tokenize(p) for p in prompts]).to(args)
+        with torch.no_grad():
+            text_features = clip_model.encode_text(text_inputs)
+        text_features = normalize(text_features, dim=-1)
 
         #######################
         # END OF YOUR CODE    #

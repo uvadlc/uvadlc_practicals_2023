@@ -70,10 +70,10 @@ class Learner:
         # PUT YOUR CODE HERE  #
         #######################
         # TODO: Turn off gradients in both the image and the text encoder
+        torch.no_grad()
         # Note: You need to keep the visual/deep prompt's parameters trainable
         # Hint: Check for "prompt_learner" and "deep_prompt" in the parameters' names
 
-        raise NotImplementedError
         #######################
         # END OF YOUR CODE    #
         #######################
