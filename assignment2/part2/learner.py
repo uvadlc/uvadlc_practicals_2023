@@ -126,7 +126,10 @@ class Learner:
             if self.args.gpu is not None:
                 # best_acc1 may be from a checkpoint from a different GPU
                 best_acc1 = best_acc1.to(self.args.gpu)
-            self.clip.prompt_learner.load_state_dict(checkpoint["state_dict"])
+            if self.args.prompt_type == 'visual_prompt':
+                self.clip.prompt_learner.load_state_dict(checkpoint["state_dict"])
+            else:
+                self.clip.load_state_dict(checkpoint["state_dict"])
             print(
                 "=> loaded checkpoint '{}' (epoch {})".format(
                     self.args.resume, checkpoint["epoch"]
