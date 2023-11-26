@@ -75,6 +75,7 @@ class VisualPromptCLIP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        self.device = args.device
 
         # TODO: Write code to compute text features.
         # Hint: You can use the code from clipzs.py here!
@@ -84,7 +85,7 @@ class VisualPromptCLIP(nn.Module):
         # - Return a tensor of shape (num_prompts, 512).
 
         # remove this line once you implement the function
-        text_inputs = torch.cat([clip.tokenize(p) for p in prompts]).to(args)
+        text_inputs = torch.cat([clip.tokenize(p) for p in prompts]).to(args.device)
         with torch.no_grad():
             text_features = clip_model.encode_text(text_inputs)
         text_features = normalize(text_features, dim=-1)
@@ -121,8 +122,14 @@ class VisualPromptCLIP(nn.Module):
         # - You need to multiply the similarity logits with the logit scale (clip_model.logit_scale).
         # - Return logits of shape (batch size, number of classes).
 
-        # remove this line once you implement the function
-        raise NotImplementedError("Implement the model_inference function.")
+        image = self.prompt_learner.forward(image)
+        image_features = self.clip_model.encode_image(image)
+
+        # Note: Ensure that the feature vectors are normalized (to unit length) before computing the similarity. 
+        # This is crucial for the dot product to accurately represent cosine similarity.
+        image_features = normalize(image_features, dim=-1)
+        logits_per_image = self.logit_scale * image_features @ self.text_features.t()
+        return logits_per_image
 
         #######################
         # END OF YOUR CODE    #
