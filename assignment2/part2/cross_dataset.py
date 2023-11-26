@@ -68,6 +68,7 @@ def parse_option():
         help="choose visual prompting method",
     )
     parser.add_argument("--prompt_type", type=str, default="visual_prompt", help="what type of prompt to use")
+    parser.add_argument("--prompt_num", type=int, default=4, help="number of learnable deep prompts to use")
     parser.add_argument("--injection_layer", type=int, default=0, help="id of transformer layer to inject prompt into")
     parser.add_argument(
         "--prompt_size", type=int, default=30, help="size for visual prompts"
