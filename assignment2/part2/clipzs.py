@@ -212,7 +212,7 @@ class ZeroshotCLIP(nn.Module):
         # - Read the CLIP API documentation for more details:
         #   https://github.com/openai/CLIP#api
         # remove this line once you implement the function
-        image = image.unsqueeze(0).to(self.device)
+        image = image.to(self.device)
         image_features = self.clip_model.encode_image(image)
         # Note: Ensure that the feature vectors are normalized (to unit length) before computing the similarity. 
         # This is crucial for the dot product to accurately represent cosine similarity.
@@ -379,14 +379,17 @@ def main():
     # - You can use the model_inference method of the ZeroshotCLIP class to get the logits
     # you can remove the following line once you have implemented the inference loop
     count = 0
+    num_batches_per_epoch = len(loader)
+
     for batch_x, batch_y in loader:
         count += 1
-        print(f'batch-{count}')
+        print(f'batch-{count} Progress {count/num_batches_per_epoch*100}%')
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_size = batch_y.shape[0]
         predictions = torch.zeros(batch_size).to(device)
         for idx, img in enumerate(batch_x):
+            img = img.unsqueeze(0)
             logits = clipzs.model_inference(img)
             pred = torch.argmax(logits, dim=1)
             predictions[idx] = pred

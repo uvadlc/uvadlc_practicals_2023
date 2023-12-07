@@ -108,7 +108,6 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
       total_loss = 0
       total_batch = 0
       for x, y in train_loader:
-        print("batch ", total_batch)
         x = x.to(device)
         y = y.to(device)
         total_batch += 1
@@ -149,11 +148,9 @@ def evaluate_model(model, data_loader, device):
     # PUT YOUR CODE HERE  #
     #######################
     # Set model to evaluation mode (Remember to set it back to training mode in the training loop)
-    pass
-
+    model.eval()
     # Loop over the dataset and compute the accuracy. Return the accuracy
     # Remember to use torch.no_grad().
-    model.eval()
     correct = 0
     total = 0
     for batch_x, batch_y in data_loader:
@@ -161,7 +158,6 @@ def evaluate_model(model, data_loader, device):
             batch_x = batch_x.to(device)
             batch_y = batch_y.to(device)
             batch_pred = np.argmax(model(batch_x).cpu().numpy(), axis=1)
-            print(batch_pred.shape, batch_y.shape)
             correct += np.sum(np.equal(batch_pred, batch_y.cpu().numpy()))
             total += batch_y.shape[0]
     accuracy = correct / total
@@ -208,7 +204,7 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name, test_noise):
     acc = evaluate_model(model=best_model, data_loader=test_loader, device=device)
 
     # default setting 30 epochs acc=0.5728. 
-    print(acc)
+    print('test acc: ', acc)
 
     #######################
     # END OF YOUR CODE    #

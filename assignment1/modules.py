@@ -244,7 +244,11 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
         def _softmax_stablized(x):
+            # find max value in each row via aixs=1
+            # subtract max value of the corresponding row from x
+            # put the result into exp function
             e_z = np.exp(x - np.max(x, axis=1, keepdims=True))
+            # divide each row with its row sum to compute the final soft max result.
             return e_z / e_z.sum(axis=1, keepdims=True)
         out = _softmax_stablized(x)
         self.cache['out'] = out
@@ -292,6 +296,18 @@ class SoftMaxModule(object):
         # v = np.reshape(v, (dout.shape[0], 1))
         # dx_2 = out * dout - v
         # print(dx_0[0], '\n', dx[0], '\n',  dx_2[0])
+        # Algo 3
+        # dy_i/dx_i = y_i*(1-y_i)
+        # dy_i/dx_j = -y_i*y_j
+        # dL/dx_j = sum_k_n dL/dy_k * dy_k/dx_j
+        #         = y_j*dL/y_j - sum_k_n y_k*y_j *dL/dy_k
+        #         = y_j*(dL/y_j - sum_k_n y_k*dL/dy_k)
+        # dout = R^(S x M)
+        # out = R^(S x M)
+        # dx[0][j] = out[0][j]*(dout[0][j] - sum(dout[0]*out[0]))
+        # dx[0] = out[0] * (dout[0] - sum(dout[0]*out[0]))
+        # dx = out * (dout - row_sum(dout * out)) where row_sum = R^(S, 1) 
+        # and [:, None] makes it a column of [size, 1]
         dx = out * (dout - (dout * out).sum(axis=1)[:, None])
         #######################
         # END OF YOUR CODE    #

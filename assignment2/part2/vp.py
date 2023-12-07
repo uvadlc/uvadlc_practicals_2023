@@ -62,7 +62,8 @@ class FixedPatchPrompter(nn.Module):
         # - First define the prompt. Then add it to the batch of images.
         # - It is always advisable to implement and then visualize if
         #   your prompter does what you expect it to do.
-        # prompt should have a dim of [1, 3, image_hight, image_width] 
+        # prompt should have a dim of [1, 3, image_hight, image_width]
+        x = x.cuda() 
         prompt = torch.zeros([1, 3, self.image_size, self.image_size]).cuda()
         # top-left corner spans from row=[0, image_height] and col [0, image_width]
         prompt[:, :, :self.prompt_size, :self.prompt_size ] = self.param
@@ -94,7 +95,6 @@ class PadPrompter(nn.Module):
         # - See Fig 2.(g)/(h) and think about the shape of self.pad_left and self.pad_right
         self.image_size = image_size
         self.pad_size = pad_size
-        self.base_size = image_size - pad_size*2
         self.pad_right = nn.Parameter(torch.randn([1, 3, image_size - pad_size*2, pad_size]))
         self.pad_left = nn.Parameter(torch.randn([1, 3, image_size - pad_size*2, pad_size]))
         self.pad_up = nn.Parameter(torch.randn([1, 3, pad_size, image_size]))
@@ -113,6 +113,7 @@ class PadPrompter(nn.Module):
         # - First define the prompt. Then add it to the batch of images.
         # - It is always advisable to implement and then visualize if
         #   your prompter does what you expect it to do.
+        x = x.cuda()
         prompt = torch.zeros([1, 3, self.image_size, self.image_size]).cuda()
         prompt[:, :, :self.pad_size, :] = self.pad_up
         prompt[:, :, self.image_size - self.pad_size:, :] = self.pad_down

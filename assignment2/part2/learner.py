@@ -73,7 +73,7 @@ class Learner:
         # Note: You need to keep the visual/deep prompt's parameters trainable
         # Hint: Check for "prompt_learner" and "deep_prompt" in the parameters' names
         for name, param in self.clip.named_parameters():
-            if 'prompt_learner' in name or 'deep_prompt' in name:
+            if 'deep_prompt' in name or 'prompt_learner' in name:
                 continue
             param.requires_grad = False
         #######################
@@ -208,6 +208,7 @@ class Learner:
         num_batches_per_epoch = len(self.train_loader)
 
         end = time.time()
+
         for i, (images, target) in enumerate(tqdm(self.train_loader)):
 
             # Measure data loading time
@@ -220,9 +221,6 @@ class Learner:
             #######################
             # PUT YOUR CODE HERE  #
             #######################
-
-            # TODO: Implement the training step for a single batch
-
             # Steps ( your usual training loop :) ):
             # - Set the gradients to zero
             self.optimizer.zero_grad()

@@ -7,6 +7,8 @@ import torch.nn as nn
 
 from clip import clip
 from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
+from torch.nn.functional import normalize
+
 
 import warnings
 
@@ -56,17 +58,15 @@ class DeepPromptCLIP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
-        # TODO: Write code to compute text features.
         # Hint: You can use the code from clipzs.py here!
 
         # Instructions:
         # - Given a list of prompts, compute the text features for each prompt.
         # - Return a tensor of shape (num_prompts, 512).
 
-        # remove this line once you implement the function
-        return self
-
+        with torch.no_grad():
+            text_features = clip_model.encode_text(prompts)
+        text_features = normalize(text_features, dim=-1)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -81,15 +81,16 @@ class DeepPromptCLIP(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
-        # TODO: Initialize the learnable deep prompt.
         # Hint: consider the shape required for the deep prompt to be compatible with the CLIP model 
         # Hint: CLIP uses different datatypes for CPU (float32) and GPU (float16)
         # Hint: use args.prompt_num to specify the number of deep prompts to use
 
-        self.deep_prompt = None
-
-        # remove this line once you implement the function
-
+        # args.prompt_num defines number of tokens to be added to the input tokens
+        # 1 is just batch size of 1.
+        # embd_size is the CLIP transformer block input size
+        # dim=[args.prompt_num, 1, embd_size]
+        embd_size = 768
+        self.deep_prompt = nn.Parameter(torch.randn(args.prompt_num, 1, embd_size)) # force it have same type as the data.
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -110,10 +111,15 @@ class DeepPromptCLIP(nn.Module):
         # - Compute similarity logits between the image features and the text features.
         # - You need to multiply the similarity logits with the logit scale (clip_model.logit_scale).
         # - Return logits of shape (batch size, number of classes).
-
-        # remove this line once you implement the function
-        raise NotImplementedError("Implement the model_inference function.")
-
+        image_features = self.custom_encode_image(image)
+        # Note: Ensure that the feature vectors are normalized (to unit length) before computing the similarity. 
+        # This is crucial for the dot product to accurately represent cosine similarity.
+        image_features = normalize(image_features, dim=-1)
+        # print("image_features shape: ", image_features.shape)
+        # print("text_features shape: ", self.text_features.shape)
+        logits_per_image = self.logit_scale * image_features @ self.text_features.t()
+        # print("logits_per_image shape: ", logits_per_image.shape)
+        return logits_per_image
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -133,7 +139,6 @@ class DeepPromptCLIP(nn.Module):
         x = image_encoder.ln_pre(x)
 
         x = x.permute(1, 0, 2)  # NLD -> LND
-
         #######################
         # PUT YOUR CODE HERE  #
         #######################
@@ -147,10 +152,17 @@ class DeepPromptCLIP(nn.Module):
         # - Inject the deep prompt at the specified layer (self.injection_layer).
 
         # Hint: Beware of the batch size (the deep prompt is the same for all images in the batch).
-
-        # remove this line once you implement the function
-        raise NotImplementedError("Implement the model_inference function.")
-
+        for i, block in enumerate(image_encoder.transformer.resblocks):
+            if i == self.injection_layer:
+                # x batch dim = [sequence_size, batch_size, emedding_size]
+                # deep prompt has the dim = [args.prompt_num, 1, emded_size]
+                # expand the deep prompt to have the dims [(args.prompt_num, batch_size, emded_size]
+                # to match the dim of the batch x
+                prompt = self.deep_prompt.to(x.dtype).expand(-1, x.size(1), -1)
+                # append the prompt to x so that we will have the extra prompt tokens. 
+                # final x batch dim = [sequence_size + args.prompt_num, batch_size, emded_size]
+                x = torch.cat((x, prompt), dim=0)
+            x = block(x)
         #######################
         # END OF YOUR CODE    #
         #######################

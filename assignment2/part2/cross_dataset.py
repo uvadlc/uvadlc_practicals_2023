@@ -23,6 +23,7 @@ from clip import clip
 from dataset import load_dataset, construct_dataloader
 from pprint import pprint
 from utils import DummyArgs
+from torch.nn.functional import normalize
 
 
 def parse_option():
@@ -178,8 +179,6 @@ def main():
         # PUT YOUR CODE HERE  #
         #######################
         # TODO: Define `classnames` as a list of 10 + 100 class labels from CIFAR10 and CIFAR100
-
-        raise NotImplementedError
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -206,8 +205,10 @@ def main():
         #######################
         # TODO: Compute the text features (for each of the prompts defined above) using CLIP
         # Note: This is similar to the code you wrote in `clipzs.py`
-
-        raise NotImplementedError
+        text_inputs = torch.cat([clip.tokenize(p) for p in prompts]).to(args.device)
+        with torch.no_grad():
+            text_features = clip_model.encode_text(text_inputs)
+        text_features = normalize(text_features, dim=-1)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -222,8 +223,10 @@ def main():
         # TODO: Add an offset of 10 to the targets of CIFAR100
         # That is, if a class in CIFAR100 corresponded to '4', it should now correspond to '14'
         # Set the result of this to the attribute cifar100_test.targets to override them
-
-        raise NotImplementedError
+        offset = 10
+        targets = torch.tensor(cifar100_test.targets)
+        targets += offset
+        cifar100_test.targets = targets.tolist()
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -253,10 +256,12 @@ def main():
         # TODO: Compute the weighted average of the above two accuracies
 
         # Hint:
-        # - accurary_all = acc_cifar10 * (% of cifar10 samples) \
+        # - accuracy_all = acc_cifar10 * (% of cifar10 samples) \
         #                  + acc_cifar100 * (% of cifar100 samples)
-
-        raise NotImplementedError
+        cifar10_size = len(cifar10_test) 
+        cifar100_size = len(cifar100_test)
+        total_size = cifar10_size + cifar100_size
+        accuracy_all = acc_cifar10 * cifar10_size / total_size + acc_cifar100 * cifar100_size / total_size
         #######################
         # END OF YOUR CODE    #
         #######################
