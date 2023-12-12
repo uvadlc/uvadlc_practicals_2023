@@ -21,8 +21,15 @@ import torch.utils.data as data
 from torch.utils.data import random_split
 import numpy as np
 
-def discretize(x, num_values):
-    return (x * num_values).long().clamp_(max=num_values-1)
+
+class DiscretizeTransform(object):
+    def __init__(self, num_values):
+        assert isinstance(num_values, int)
+        self.num_values = num_values
+
+    def __call__(self, x):
+        return (x * self.num_values).long().clamp_(max=self.num_values-1)
+
 
 def mnist(root='../data/', batch_size=128, num_workers=4, download=True):
     """
@@ -38,7 +45,7 @@ def mnist(root='../data/', batch_size=128, num_workers=4, download=True):
                    root directory.
     """
     data_transforms = transforms.Compose([transforms.ToTensor(),
-                                          transforms.Lambda(lambda x: discretize(x, num_values=16))
+                                          DiscretizeTransform(num_values=16)
                                         ])
 
     dataset = torchvision.datasets.MNIST(
